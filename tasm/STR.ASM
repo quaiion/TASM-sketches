@@ -22,7 +22,7 @@ start:
 string		db '112'
 
 ;==============================================================
-;		      Function section
+;		       Function section
 ;==============================================================
 
 ;--------------------------------------------------------------
@@ -143,15 +143,18 @@ strcmp		proc
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
-; ITOA
-; Creates a string with a number of radix mentioned
-; Enter: 
-; Exit: 
-; Note: 
-; Destr:
+; ITOA_10
+; Creates a string with a decimal number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = number of digits inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+; Destr: 
 ;--------------------------------------------------------------
 
-itoa		proc
+itoa_10		proc
 
 
 
@@ -161,7 +164,201 @@ itoa		proc
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
-; ATOI
+; ITOA_2
+; Creates a string with a binary number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = number of digits inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+SENIOR_BIT	= 80h
+JUNIOR_BIT	= 01h
+
+itoa_2		proc
+
+		xor cx, cx
+@@find:		cmp cl, 10h
+		je @@zero
+		test dh, SENIOR_BIT
+		jnz @@rdy
+		inc cl			; resulting ch == number of preceding zeros
+		shl dx
+		jmp @@find
+
+@@rdy:		shr dx, cl
+		mov ah, 10h
+		sub ah, cl
+		mov cl, ah		; cx == number of digits
+		add di, cx		; ch == 0
+		dec di
+
+		std
+		mov es, ds
+@@next:		mov al, dl
+		and al, JUNIOR_BIT
+		add al, '0'
+		stosb
+		ror dx
+		loop @@next
+		
+		mov cl, ah
+		rol dx, cl		; restoring the original value
+		inc di
+		ret
+
+@@zero:		mov cl, 1
+		mov byte ptr ds:[di], '0'
+		ret
+
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ITOA_4
+; Creates a string with a quaternery number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = number of digits inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+SENIOR_DIG	= 0c0h
+JUNIOR_DIG	= 03h
+
+itoa_4		proc
+
+		xor cx, cx
+@@find:		cmp cl, 10h
+		je @@zero
+		test dh, SENIOR_DIG
+		jnz @@rdy
+		add cl, 2		; resulting ch == number of preceding zero bits
+		shl dx, 2
+		jmp @@find
+
+@@rdy:		shr dx, cl
+		mov ah, 10h
+		sub ah, cl
+		mov cl, ah		; cx == number of bits to print
+		shr cl			; nbits --> ndigits
+		add di, cx		; ch == 0
+		dec di
+
+		std
+		mov es, ds
+@@next:		mov al, dl
+		and al, JUNIOR_DIG
+		add al, '0'
+		stosb
+		ror dx, 2
+		loop @@next
+		
+		mov cl, ah
+		rol dx, cl
+		shr cl
+		inc di
+		ret
+
+@@zero:		mov cl, 1
+		mov byte ptr ds:[di], '0'
+		ret
+
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ITOA_8
+; Creates a string with an octal number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = number of digits inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+SENIOR_DIG	= 0e0h
+JUNIOR_DIG	= 07h
+
+itoa_8		proc
+
+		xor cx, cx
+@@find:		cmp cl, 12h
+		je @@zero
+		test dh, SENIOR_DIG
+		jnz @@rdy
+		add cl, 3		; resulting ch == number of preceding zero bits
+		shl dx, 3
+		jmp @@find
+
+@@rdy:		shr dx, cl
+		mov ah, 10h
+		sub ah, cl
+		mov cl, ah		; cx == number of bits to print
+					; nbits --> ndigits
+		add di, cx		; ch == 0
+		dec di
+
+		std
+		mov es, ds
+@@next:		mov al, dl
+		and al, JUNIOR_DIG
+		add al, '0'
+		stosb
+		ror dx, 2
+		loop @@next
+		
+		mov cl, ah
+		rol dx, cl
+		shr cl
+		inc di
+		ret
+
+@@zero:		mov cl, 1
+		mov byte ptr ds:[di], '0'
+		ret
+
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ITOA_16
+; Creates a string with an hex number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = number of digits inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked 
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr:
+;--------------------------------------------------------------
+
+itoa_16		proc
+
+
+
+		ret
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ATOI_10
 ; Extracts a decimal number from a string
 ; Enter: SI = string addr
 ; Exit:  BX = signed value extracted
@@ -169,7 +366,7 @@ itoa		proc
 ; Destr: AX BX CX DX
 ;--------------------------------------------------------------
 
-atoi		proc
+atoi_10		proc
 
 		cld
 		xor ch, ch		; ch will be 0 if val is pos and nonnull if val is neg
@@ -194,7 +391,7 @@ atoi		proc
 
 		mov bx, 1
 @@next:		cmp cl, 0
-		jb @@exit
+		je @@exit
 		mov al, byte ptr ds:[si]
 		dec si
 		sub al, '0'
