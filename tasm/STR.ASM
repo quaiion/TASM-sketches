@@ -164,51 +164,57 @@ itoa		proc
 ; ATOI
 ; Extracts a decimal number from a string
 ; Enter: SI = string addr
-; Exit:  BX = value extracted
-; Note:  про количество цифор
-; Destr: AX BX CX DX SI
+; Exit:  BX = signed value extracted
+; Note:  The value extracted can be a number from -2147483648 to 2147483647 inclusively
+; Destr: AX BX CX DX
 ;--------------------------------------------------------------
 
 atoi		proc
 
 		cld
-
-		mov cx, si
-
+		xor ch, ch		; ch will be 0 if val is pos and nonnull if val is neg
+		mov bx, si
 		cmp byte ptr ds:[si], '-'
-		je @@minus
+		jne @@begin
+		inc si
+		inc bx
+		not ch
 
 @@begin:	lodsb
 		cmp al, '9'
-		ja @@stop_1
+		ja @@stop
 		cmp al, '0'
-		jb @@stop_1
+		jb @@stop
 		jmp @@begin
 		
-@@stop_1:	sub cx, si
-		sub si, cx
-		sub cx, 1		; possibly fucks up all
+@@stop:		mov dx, si
+		sub dx, bx		; dh == 0, number is too low to fill it, cl contains the num of digits
+		mov cl, dl
+		dec si
 
-		xor bx. bx
-@@next:		cmp ch, 0
-		je @@stop_2
-		mov cl, byte ptr ds:[si]
-		inc si
-		sub cl, '0'
-		dec ch			; possibly fucks up all
-		push ch
-		call tenpow		; ch == 0 and cx == cl after this
-		mul cx
-		add bx, ax
-		pop ch
+		mov bx, 1
+@@next:		cmp cl, 0
+		jb @@exit
+		mov al, byte ptr ds:[si]
+		dec si
+		sub al, '0'
+		dec cl
+		xor ah, ah
+		mul bx
+		add offset resval, ax
+		mov ax, 10
+		mul bx
+		mov bx, ax
 		jmp @@next
-
-@@stop_2:	ret
-
-@@minus:	inc si
-		inc cx
-		jmp @@begin
 		
+@@exit:		mov bx, offset resval
+		jcxz @@nonneg		; cl == 0 (end of loop) checking ch
+		neg bx
+		ret
+
+@@nonneg:	inc si
+		ret
+
 		endp
 
 ;--------------------------------------------------------------
@@ -218,10 +224,10 @@ atoi		proc
 ;==============================================================
 
 ;--------------------------------------------------------------
-; Counts the n power of 10
-; Enter: CH = power
+; Counts the N power of 10
+; Enter: CH = power (N)
 ; Exit:  AX = value counted
-; Note:  про количество цифор
+; Note:  N can be a number from 0 to 9 inclusively
 ; Destr: AX CH DX
 ;--------------------------------------------------------------
 
