@@ -25,6 +25,8 @@ string		db '112'
 ;		       Function section
 ;==============================================================
 
+NEGAT_BIT	= 8000h
+
 ;--------------------------------------------------------------
 ; STRLEN
 ; Counts number of symbols in a string
@@ -177,7 +179,29 @@ itoa_10		proc
 
 sitoa_10	proc
 
+		test dx, NEGAT_BIT
+		jz @@posit
+
+		cld
+		mov al, '-'
+		stosb		
+		shl dx
+		shr dx
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; making unsigned (abs)
+		call itoa_10
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; restoring signed
+		or dx, NEGAT_BIT	; restoring negative bit
+		inc cl
+		dec di
 		ret
+
+@@posit:	call itoa_10
+		ret
+
 		endp
 		
 ;--------------------------------------------------------------
@@ -253,7 +277,29 @@ itoa_2		proc
 
 sitoa_2		proc
 
+		test dx, NEGAT_BIT
+		jz @@posit
+
+		cld
+		mov al, '-'
+		stosb		
+		shl dx
+		shr dx
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; making unsigned (abs)
+		call itoa_2
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; restoring signed
+		or dx, NEGAT_BIT	; restoring negative bit
+		inc cl
+		dec di
 		ret
+
+@@posit:	call itoa_2
+		ret
+
 		endp
 		
 ;--------------------------------------------------------------
@@ -331,7 +377,29 @@ itoa_4		proc
 
 sitoa_4		proc
 
+		test dx, NEGAT_BIT
+		jz @@posit
+
+		cld
+		mov al, '-'
+		stosb		
+		shl dx
+		shr dx
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; making unsigned (abs)
+		call itoa_4
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; restoring signed
+		or dx, NEGAT_BIT	; restoring negative bit
+		inc cl
+		dec di
 		ret
+
+@@posit:	call itoa_4
+		ret
+
 		endp
 		
 ;--------------------------------------------------------------
@@ -417,7 +485,29 @@ itoa_8		proc
 
 sitoa_8		proc
 
+		test dx, NEGAT_BIT
+		jz @@posit
+
+		cld
+		mov al, '-'
+		stosb		
+		shl dx
+		shr dx
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; making unsigned (abs)
+		call itoa_8
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; restoring signed
+		or dx, NEGAT_BIT	; restoring negative bit
+		inc cl
+		dec di
 		ret
+
+@@posit:	call itoa_8
+		ret
+
 		endp
 		
 ;--------------------------------------------------------------
@@ -500,7 +590,29 @@ itoa_16		proc
 
 sitoa_16	proc
 
+		test dx, NEGAT_BIT
+		jz @@posit
+
+		cld
+		mov al, '-'
+		stosb		
+		shl dx
+		shr dx
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; making unsigned (abs)
+		call itoa_16
+		mov ax, dx
+		mov dx, 7fffh
+		sub dx, ax		; restoring signed
+		or dx, NEGAT_BIT	; restoring negative bit
+		inc cl
+		dec di
 		ret
+
+@@posit:	call itoa_16
+		ret
+
 		endp
 		
 ;--------------------------------------------------------------
