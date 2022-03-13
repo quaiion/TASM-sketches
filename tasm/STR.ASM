@@ -144,10 +144,10 @@ strcmp		proc
 
 ;--------------------------------------------------------------
 ; ITOA_10
-; Creates a string with a decimal number mentioned
+; Creates a string with an unsigned decimal number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = number of digits inserted
+; Exit:  CL = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
@@ -164,11 +164,30 @@ itoa_10		proc
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
+; SITOA_10
+; Creates a string with a signed decimal number mentioned
+; Enter: DX = SIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+; Destr: 
+;--------------------------------------------------------------
+
+sitoa_10	proc
+
+		ret
+		endp
+		
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
 ; ITOA_2
-; Creates a string with a binary number mentioned
+; Creates a string with an unsigned binary number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = number of digits inserted
+; Exit:  CL = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
@@ -176,15 +195,15 @@ itoa_10		proc
 ; Destr: AX CX
 ;--------------------------------------------------------------
 
-SENIOR_BIT	= 80h
-JUNIOR_BIT	= 01h
+SENIOR_BITS_B	= 80h
+JUNIOR_BITS_B	= 01h
 
 itoa_2		proc
 
 		xor cx, cx
 @@find:		cmp cl, 10h
 		je @@zero
-		test dh, SENIOR_BIT
+		test dh, SENIOR_BITS_B
 		jnz @@rdy
 		inc cl			; resulting ch == number of preceding zeros
 		shl dx
@@ -194,19 +213,19 @@ itoa_2		proc
 		mov ah, 10h
 		sub ah, cl
 		mov cl, ah		; cx == number of digits
-		add di, cx		; ch == 0
+		add di, cx		; cl == cx
 		dec di
 
 		std
 		mov es, ds
 @@next:		mov al, dl
-		and al, JUNIOR_BIT
+		and al, JUNIOR_BITS_B
 		add al, '0'
 		stosb
 		ror dx
 		loop @@next
 		
-		mov cl, ah
+		mov cl, ah		; cl == nbits == ndigits
 		rol dx, cl		; restoring the original value
 		inc di
 		ret
@@ -220,11 +239,11 @@ itoa_2		proc
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
-; ITOA_4
-; Creates a string with a quaternery number mentioned
-; Enter: DX = UNSIGNED number's value
+; SITOA_2
+; Creates a string with a signed binary number mentioned
+; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = number of digits inserted
+; Exit:  CL = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
@@ -232,15 +251,35 @@ itoa_2		proc
 ; Destr: AX CX
 ;--------------------------------------------------------------
 
-SENIOR_DIG	= 0c0h
-JUNIOR_DIG	= 03h
+sitoa_2		proc
+
+		ret
+		endp
+		
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ITOA_4
+; Creates a string with an unsigned quaternery number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+SENIOR_BITS_Q	= 0c0h
+JUNIOR_BITS_Q	= 03h
 
 itoa_4		proc
 
 		xor cx, cx
 @@find:		cmp cl, 10h
 		je @@zero
-		test dh, SENIOR_DIG
+		test dh, SENIOR_BITS_Q
 		jnz @@rdy
 		add cl, 2		; resulting ch == number of preceding zero bits
 		shl dx, 2
@@ -249,23 +288,23 @@ itoa_4		proc
 @@rdy:		shr dx, cl
 		mov ah, 10h
 		sub ah, cl
-		mov cl, ah		; cx == number of bits to print
+		mov cl, ah		; cl (and cx) == nbits
 		shr cl			; nbits --> ndigits
-		add di, cx		; ch == 0
+		add di, cx		; cl == cx
 		dec di
 
 		std
 		mov es, ds
 @@next:		mov al, dl
-		and al, JUNIOR_DIG
+		and al, JUNIOR_BITS_Q
 		add al, '0'
 		stosb
 		ror dx, 2
 		loop @@next
 		
 		mov cl, ah
-		rol dx, cl
-		shr cl
+		rol dx, cl		; restoring the original value
+		shr cl			; nbits --> ndigits
 		inc di
 		ret
 
@@ -278,11 +317,11 @@ itoa_4		proc
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
-; ITOA_8
-; Creates a string with an octal number mentioned
-; Enter: DX = UNSIGNED number's value
+; SITOA_4
+; Creates a string with a signed quaternery number mentioned
+; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = number of digits inserted
+; Exit:  CL = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
@@ -290,40 +329,68 @@ itoa_4		proc
 ; Destr: AX CX
 ;--------------------------------------------------------------
 
-SENIOR_DIG	= 0e0h
-JUNIOR_DIG	= 07h
+sitoa_4		proc
+
+		ret
+		endp
+		
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ITOA_8
+; Creates a string with an unsigned octal number mentioned
+; Enter: DX = UNSIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+SENIOR_BITS_O	= 0e0h
+JUNIOR_BITS_O	= 07h
 
 itoa_8		proc
 
 		xor cx, cx
 @@find:		cmp cl, 12h
 		je @@zero
-		test dh, SENIOR_DIG
+		test dh, SENIOR_BITS_O
 		jnz @@rdy
 		add cl, 3		; resulting ch == number of preceding zero bits
 		shl dx, 3
 		jmp @@find
 
 @@rdy:		shr dx, cl
-		mov ah, 10h
-		sub ah, cl
-		mov cl, ah		; cx == number of bits to print
-					; nbits --> ndigits
-		add di, cx		; ch == 0
+		mov al, 10h
+		sub al, cl
+		xor ah, ah
+		mov cl, al		; cl contains nbits
+		mov ch, 3
+		div ch			; nbits --> ndigits
+		mov ah, cl		; ah contains nbits
+		mov cl, al		; cl contains ndigits
+		xor ch, ch		; cl == cx
+		add di, cx
 		dec di
 
 		std
 		mov es, ds
 @@next:		mov al, dl
-		and al, JUNIOR_DIG
+		and al, JUNIOR_BITS_O
 		add al, '0'
 		stosb
-		ror dx, 2
+		ror dx, 3
 		loop @@next
 		
 		mov cl, ah
-		rol dx, cl
-		shr cl
+		rol dx, cl		; restoring the original value
+		mov ax, cx
+		mov cl, 3
+		div cl			; nbits --> ndigits
+		mov cl, al
 		inc di
 		ret
 
@@ -336,25 +403,106 @@ itoa_8		proc
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
+; SITOA_8
+; Creates a string with a signed octal number mentioned
+; Enter: DX = SIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+sitoa_8		proc
+
+		ret
+		endp
+		
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
 ; ITOA_16
-; Creates a string with an hex number mentioned
+; Creates a string with an unsigned hex number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = number of digits inserted
+; Exit:  CL = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked 
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr:
+; Destr: AX CX
 ;--------------------------------------------------------------
+
+SENIOR_BITS_H	= 0f0h
+JUNIOR_BITS_H	= 0fh
+LETTER_SHFT	= 'a' - '9'
 
 itoa_16		proc
 
+		xor cx, cx
+@@find:		cmp cl, 10h
+		je @@zero
+		test dh, SENIOR_BITS_H
+		jnz @@rdy
+		add cl, 4		; resulting ch == number of preceding zero bits
+		shl dx, 4
+		jmp @@find
 
+@@rdy:		shr dx, cl
+		mov ah, 10h
+		sub ah, cl
+		mov cl, ah		; cl (and cx) == nbits
+		shr cl, 2		; nbits --> ndigits (div by 4)
+		add di, cx		; cl == cx
+		dec di
+
+		std
+		mov es, ds
+@@next:		mov al, dl
+		and al, JUNIOR_BITS_H
+		cmp al, 0ah		; decide letter/digit
+		jb @@nolett
+		add al, LETTER_SHFT
+@@nolett:	add al, '0'
+		stosb
+		ror dx, 4
+		loop @@next
+		
+		mov cl, ah
+		rol dx, cl		; restoring the original value
+		shr cl, 2		; nbits --> ndigits (div by 4)
+		inc di
+		ret
+
+@@zero:		mov cl, 1
+		mov byte ptr ds:[di], '0'
+		ret
 
 		ret
 		endp
 
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; SITOA_16
+; Creates a string with a signed hex number mentioned
+; Enter: DX = SIGNED number's value
+;	 DI = where-to-insert string addr
+; Exit:  CL = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked 
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+; Destr: AX CX
+;--------------------------------------------------------------
+
+sitoa_16	proc
+
+		ret
+		endp
+		
 ;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
