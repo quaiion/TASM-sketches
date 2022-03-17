@@ -7,18 +7,6 @@ VIDEOSEG	= 0b800h
 
 start:		
 
-		push VIDEOSEG
-		pop es
-
-		mov si, offset string
-		call atoi
-		
-		mov ah, 2
-		mov di, 
-
-		mov ax, 4c00h
-		int 21h
-
 string		db '112'
 
 ;==============================================================
@@ -32,7 +20,7 @@ NEGAT_BIT	= 8000h
 ; Counts number of symbols in a string
 ; Enter: SI = string addr
 ; Exit:  BX = number of symbs
-; Note:	 None
+; Note:	 Direction flag is set to UP
 ; Destr: SI BX AL
 ;--------------------------------------------------------------
 
@@ -43,8 +31,8 @@ strlen		proc
 		mov bx, si
 
 @@next:		lodsb		; can be done without loading to register
-		cmp al, 0
-		jne @@next
+		test al, 0ffh
+		jnz @@next
 
 		sub si, bx
 		dec si
@@ -61,7 +49,7 @@ strlen		proc
 ; Enter: SI = string addr
 ;	 DL = ASCII code of character searched
 ; Exit:  BX = first appearance addr (-1 if no searched char found)
-; Note:  None
+; Note:  Direction flag is set to UP
 ; Destr: SI BX AL
 ;--------------------------------------------------------------
 
@@ -72,8 +60,8 @@ strchr		proc
 		cld
 
 @@next:		lodsb
-		cmp al, 0
-		je @@stop
+		test al, 0ffh
+		jz @@stop
 		cmp al, dl
 		jne @@next
 
@@ -95,6 +83,7 @@ strchr		proc
 ;	 DI = dest string addr
 ; Exit:  None
 ; Note:  Be aware of dest buffer overflow, string sizes are not compared
+;	 Direction flag is set to UP
 ; Destr: SI DI AL
 ;--------------------------------------------------------------
 
@@ -104,8 +93,8 @@ strcpy		proc
 
 @@next:		lodsb
 		stosw
-		cmp al, 0
-		jne @@next
+		test al, 0ffh
+		jnz @@next
 
 		ret
 		endp
@@ -120,7 +109,7 @@ strcpy		proc
 ; Exit:  AL > 0 if first str is greater
 ;	 AL < 0 if second str is greater
 ;	 AL = 0 if strings are similar
-; Note:  None
+; Note:  Direction flag is set to UP
 ; Destr: Destr: SI DI AX
 ;--------------------------------------------------------------
 
@@ -132,12 +121,12 @@ strcmp		proc
 		mov ah, byte ptr ds:[di]
 		inc di
 		sub al, ah
-		cmp al, 0
-		je @@ifend
+		test al, 0ffh
+		jz @@ifend
 		ret
 
-@@ifend:	cmp ah, 0
-		jne @@next
+@@ifend:	test ah, 0ffh
+		jnz @@next
 		ret
 
 		endp
@@ -149,19 +138,53 @@ strcmp		proc
 ; Creates a string with an unsigned decimal number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = size of string inserted
+; Exit:  CX = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
-; Destr: 
+;	 Direction flag is set to DN
+; Destr: AX BX CX
 ;--------------------------------------------------------------
 
 itoa_10		proc
 
+		cld
+		mov offset initval, dx
+		xor cx, cx
+		mov ax, dx
+		mov bx, 10
+@@count:	test ax, 0ffffh
+		jz @@stop
+		inc cl
+		xor dx, dx		; clearing senior word in double register
+		div bx
+		jmp @@count
+		
+@@stop:		jcxz @@zero		; cl == ndigits; or 0, if zero
+		add di, cx
+		std
+		mov ax, offset initval
+		mov ch, cl		; ndigits is long-stored in cl, ch - counter
+@@next:		div bx			; value is too small, mod is stored in dl, dh == 0
+		xchg dx, ax
+		add al, '0'
+		stosb
+		mov ax, dx
+		dec ch
+		test ch, 0ffh
+		jnz @@next
 
-
+		inc di
+		mov dx, offset initval
 		ret
+		
+@@zero:		mov cl, 1
+		mov byte ptr ds:[di], '0'
+		ret			; dx has not changed
+
 		endp
+
+initval		dw ?
 
 ;--------------------------------------------------------------
 
@@ -170,11 +193,12 @@ itoa_10		proc
 ; Creates a string with a signed decimal number mentioned
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
-; Exit:  CL = size of string inserted
+; Exit:  CX = size of string inserted
 ; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
-; Destr: 
+;	 Direction flag is set to DN
+; Destr: AX BX CX
 ;--------------------------------------------------------------
 
 sitoa_10	proc
@@ -622,7 +646,8 @@ sitoa_16	proc
 ; Extracts a decimal number from a string
 ; Enter: SI = string addr
 ; Exit:  BX = signed value extracted
-; Note:  The value extracted can be a number from -2147483648 to 2147483647 inclusively
+; Note:  The value extracted can be a number from -32768 to 32767 inclusively
+;	 Direction flag is set to UP
 ; Destr: AX BX CX DX
 ;--------------------------------------------------------------
 
@@ -650,8 +675,8 @@ atoi_10		proc
 		dec si
 
 		mov bx, 1
-@@next:		cmp cl, 0
-		je @@exit
+@@next:		test cl, 0ffh
+		jz @@exit
 		mov al, byte ptr ds:[si]
 		dec si
 		sub al, '0'
@@ -674,34 +699,10 @@ atoi_10		proc
 
 		endp
 
+resval		dw 0
+
 ;--------------------------------------------------------------
 
 ;==============================================================
-; 			Tool section
+;		    End of function section
 ;==============================================================
-
-;--------------------------------------------------------------
-; Counts the N power of 10
-; Enter: CH = power (N)
-; Exit:  AX = value counted
-; Note:  N can be a number from 0 to 9 inclusively
-; Destr: AX CH DX
-;--------------------------------------------------------------
-
-tenpow		proc
-
-		mov ax, 10
-
-@@pow:		cmp ch, 0
-		je @@stop
-		mov dx, 10
-		mul dx
-		dec ch
-		jmp @@pow
-
-@@stop:		ret
-		endp
-
-;--------------------------------------------------------------
-
-end		start
