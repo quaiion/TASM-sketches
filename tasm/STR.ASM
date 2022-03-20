@@ -5,14 +5,36 @@ locals @@
 
 VIDEOSEG	= 0b800h
 
-start:		mov si, offset string
-		call strlen
-		
+start:		mov ax, ds
+		mov es, ax
 
-string		db '1' '2' 'a' 'M' '5' '$'
+		mov si, offset source
+		call atoi_10
+
+		mov dx, bx
+		mov di, offset string
+		call itoa_8
+
+		cld
+		mov ax, VIDEOSEG
+		mov es, ax
+		
+		mov di, (80 * 5 + 10) * 2
+		mov si, offset string
+		mov ah, 0ceh
+		mov cx, 30
+next:		lodsb
+		stosw
+		loop next
+		
+		mov ax, 4c00h
+		int 21h
+
+source		db '9', '3', '2', '$'
+string		db 30 dup ('e')
 
 ;==============================================================
-;		      Function section
+;		       Function section
 ;==============================================================
 
 NEGAT_BIT	= 8000h
@@ -21,24 +43,23 @@ NEGAT_BIT	= 8000h
 ; STRLEN
 ; Counts number of symbols in a string
 ; Enter: SI = string addr
-; Exit:  BX = number of symbs
+; Exit:  CX = number of symbs
 ; Note:	 Direction flag is set to UP
-; Destr: SI BX AL
+; Destr: SI CX
 ;--------------------------------------------------------------
 
 strlen		proc
 
 		cld
-		mov bx, si
+		mov cx, si
 
 @@next:		cmp byte ptr ds:[si], '$'
+		je @@exit
 		inc si
-		jne @@next
+		jmp @@next
 
-		sub si, bx
-		dec si
-		mov bx, si		; idk how ABI works but this looks safer
-
+@@exit:		sub si, cx
+		mov cx, si
 		ret
 		endp
 
@@ -50,15 +71,14 @@ strlen		proc
 ; Enter: SI = string addr
 ;	 DL = ASCII code of character searched
 ; Exit:  BX = first appearance addr (-1 if no searched char found)
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 Direction flag is set to UP
-; Destr: SI BX AL
+; Destr: SI BX AL ES
 ;--------------------------------------------------------------
 
 strchr		proc
 
 		cld
-		mov es, ds
 
 @@next:		lodsb
 		cmp al, '$'
@@ -83,19 +103,18 @@ strchr		proc
 ; Enter: SI = source string addr
 ;	 DI = dest string addr
 ; Exit:  None
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 Be aware of dest buffer overflow, string sizes are not compared
 ;	 Direction flag is set to UP
-; Destr: SI DI AL
+; Destr: SI DI AL ES
 ;--------------------------------------------------------------
 
 strcpy		proc
 
 		cld
-		mov es, ds
 
 @@next:		lodsb
-		stosw
+		stosb
 		cmp al, '$'
 		jne @@next
 
@@ -112,15 +131,14 @@ strcpy		proc
 ; Exit:  AL > 0 if first str is greater
 ;	 AL < 0 if second str is greater
 ;	 AL = 0 if strings are similar
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 Direction flag is set to UP
-; Destr: Destr: SI DI AX
+; Destr: Destr: SI DI AX ES
 ;--------------------------------------------------------------
 
 strcmp		proc
 
 		cld
-		mov es, ds
 
 @@next:		lodsb
 		mov ah, byte ptr ds:[di]
@@ -129,7 +147,6 @@ strcmp		proc
 		test al, 0ffh
 		jz @@stop
 		ret
-
 @@stop:		cmp ah, '$'
 		jne @@next
 		ret
@@ -144,19 +161,18 @@ strcmp		proc
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CX = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX BX CX
+; Destr: AX BX CX ES
 ;--------------------------------------------------------------
 
 itoa_10		proc
 
 		cld
-		mov es, ds
-		mov offset initval, dx
+		mov initval, dx
 		xor cx, cx
 		mov ax, dx
 		mov bx, 10
@@ -172,10 +188,11 @@ itoa_10		proc
 		mov byte ptr ds:[di], '$'
 		dec di
 		std
-		mov ax, offset initval
+		mov ax, initval
 		mov ch, cl		; ndigits is long-stored in cl, ch - counter
 		inc cl			; "$" symb
-@@next:		div bx			; value is too small, mod is stored in dl, dh == 0
+@@next:		xor dx, dx		; clearing senior word in double register
+		div bx			; value is too small, mod is stored in dl, dh == 0
 		xchg dx, ax
 		add al, '0'
 		stosb
@@ -185,11 +202,11 @@ itoa_10		proc
 		jnz @@next
 
 		inc di
-		mov dx, offset initval
+		mov dx, initval
 		ret
 		
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '0$'
+		mov word ptr ds:[di], '$0'
 		ret			; dx has not changed
 
 		endp
@@ -204,33 +221,25 @@ initval		dw ?
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CX = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX BX CX
+; Destr: AX BX CX ES
 ;--------------------------------------------------------------
 
 sitoa_10	proc
 
-		mov es, ds
 		test dx, NEGAT_BIT
 		jz @@posit
 
 		cld
 		mov al, '-'
 		stosb		
-		shl dx
-		shr dx
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; making unsigned (abs)
+		neg dx
 		call itoa_10
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; restoring signed
-		or dx, NEGAT_BIT	; restoring negative bit
+		neg dx
 		inc cl
 		dec di
 		ret
@@ -248,12 +257,12 @@ sitoa_10	proc
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 SENIOR_BITS_B	= 80h
@@ -261,14 +270,13 @@ JUNIOR_BITS_B	= 01h
 
 itoa_2		proc
 
-		mov es, ds
 		xor cx, cx
 @@find:		cmp cl, 10h
 		je @@zero
 		test dh, SENIOR_BITS_B
 		jnz @@rdy
 		inc cl			; resulting cl == number of preceding zeros
-		shl dx
+		shl dx, 1
 		jmp @@find
 
 @@rdy:		shr dx, cl
@@ -279,12 +287,11 @@ itoa_2		proc
 		mov byte ptr ds:[di], '$'
 		dec di
 		std
-		mov es, ds
 @@next:		mov al, dl
 		and al, JUNIOR_BITS_B
 		add al, '0'
 		stosb
-		ror dx
+		ror dx, 1
 		loop @@next
 		
 		mov cl, ah		; cl == nbits == ndigits
@@ -294,7 +301,7 @@ itoa_2		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '0$'
+		mov word ptr ds:[di], '$0'
 		ret
 
 		endp
@@ -307,33 +314,25 @@ itoa_2		proc
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 sitoa_2		proc
 
-		mov es, ds
 		test dx, NEGAT_BIT
 		jz @@posit
 
 		cld
 		mov al, '-'
 		stosb		
-		shl dx
-		shr dx
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; making unsigned (abs)
+		neg dx
 		call itoa_2
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; restoring signed
-		or dx, NEGAT_BIT	; restoring negative bit
+		neg dx
 		inc cl
 		dec di
 		ret
@@ -351,12 +350,12 @@ sitoa_2		proc
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 SENIOR_BITS_Q	= 0c0h
@@ -364,7 +363,6 @@ JUNIOR_BITS_Q	= 03h
 
 itoa_4		proc
 
-		mov es, ds
 		xor cx, cx
 @@find:		cmp cl, 10h
 		je @@zero
@@ -378,7 +376,7 @@ itoa_4		proc
 		mov ah, 10h
 		sub ah, cl
 		mov cl, ah		; cl (and cx) == nbits
-		shr cl			; nbits --> ndigits
+		shr cl, 1			; nbits --> ndigits
 		add di, cx		; cl == cx
 		mov byte ptr ds:[di], '$'
 		dec di
@@ -392,13 +390,13 @@ itoa_4		proc
 		
 		mov cl, ah
 		rol dx, cl		; restoring the original value
-		shr cl			; nbits --> ndigits
+		shr cl, 1		; nbits --> ndigits
 		inc cl			; "$" symb
 		inc di
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '0$'
+		mov word ptr ds:[di], '$0'
 		ret
 
 		endp
@@ -411,33 +409,25 @@ itoa_4		proc
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 sitoa_4		proc
 
-		mov es, ds
 		test dx, NEGAT_BIT
 		jz @@posit
 
 		cld
 		mov al, '-'
 		stosb		
-		shl dx
-		shr dx
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; making unsigned (abs)
+		neg dx
 		call itoa_4
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; restoring signed
-		or dx, NEGAT_BIT	; restoring negative bit
+		neg dx
 		inc cl
 		dec di
 		ret
@@ -455,12 +445,12 @@ sitoa_4		proc
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 SENIOR_BITS_O	= 0e0h
@@ -468,7 +458,6 @@ JUNIOR_BITS_O	= 07h
 
 itoa_8		proc
 
-		mov es, ds
 		xor cx, cx
 @@find:		cmp cl, 12h
 		je @@zero
@@ -484,7 +473,8 @@ itoa_8		proc
 		xor ah, ah
 		mov cl, al		; cl contains nbits
 		mov ch, 3
-		div ch			; nbits --> ndigits
+		div ch			; nbits --> ndigits - 1 (bec mod 3)
+		inc al			; ndigits - 1 --> ndigits
 		mov ah, cl		; ah contains nbits
 		mov cl, al		; cl contains ndigits
 		xor ch, ch		; cl == cx
@@ -493,7 +483,6 @@ itoa_8		proc
 		dec di
 
 		std
-		mov es, ds
 @@next:		mov al, dl
 		and al, JUNIOR_BITS_O
 		add al, '0'
@@ -512,7 +501,7 @@ itoa_8		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '0$'
+		mov word ptr ds:[di], '$0'
 		ret
 
 		endp
@@ -525,33 +514,25 @@ itoa_8		proc
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 sitoa_8		proc
 
-		mov es, ds
 		test dx, NEGAT_BIT
 		jz @@posit
 
 		cld
 		mov al, '-'
 		stosb		
-		shl dx
-		shr dx
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; making unsigned (abs)
+		neg dx
 		call itoa_8
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; restoring signed
-		or dx, NEGAT_BIT	; restoring negative bit
+		neg dx
 		inc cl
 		dec di
 		ret
@@ -569,12 +550,12 @@ sitoa_8		proc
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked 
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 SENIOR_BITS_H	= 0f0h
@@ -583,7 +564,6 @@ LETTER_SHFT	= 'a' - '9'
 
 itoa_16		proc
 
-		mov es, ds
 		xor cx, cx
 @@find:		cmp cl, 10h
 		je @@zero
@@ -603,7 +583,6 @@ itoa_16		proc
 		dec di
 
 		std
-		mov es, ds
 @@next:		mov al, dl
 		and al, JUNIOR_BITS_H
 		cmp al, 0ah		; decide letter/digit
@@ -622,7 +601,7 @@ itoa_16		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '0$'
+		mov word ptr ds:[di], '$0'
 		ret
 
 		ret
@@ -636,33 +615,25 @@ itoa_16		proc
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
 ; Exit:  CL = size of string inserted
-; Note:  ES = DS
+; Note:  ES should be set to DS
 ;	 The string should have enough free/unused space to store the digits;
 ;	 limits are not checked 
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX
+; Destr: AX CX ES
 ;--------------------------------------------------------------
 
 sitoa_16	proc
 
-		mov es, ds
 		test dx, NEGAT_BIT
 		jz @@posit
 
 		cld
 		mov al, '-'
 		stosb		
-		shl dx
-		shr dx
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; making unsigned (abs)
+		neg dx
 		call itoa_16
-		mov ax, dx
-		mov dx, 7fffh
-		sub dx, ax		; restoring signed
-		or dx, NEGAT_BIT	; restoring negative bit
+		neg dx
 		inc cl
 		dec di
 		ret
@@ -678,17 +649,16 @@ sitoa_16	proc
 ; ATOI_10
 ; Extracts a decimal number from a string
 ; Enter: SI = string addr
-; Exit:  BX = signed value extracted
-; Note:  ES = DS
+; Exit:  DX = signed value extracted
+; Note:  ES should be set to DS
 ;	 The value extracted can be a number from -32768 to 32767 inclusively
 ;	 Direction flag is set to UP
-; Destr: AX BX CX DX
+; Destr: AX BX CX DX ES
 ;--------------------------------------------------------------
 
 atoi_10		proc
 
 		cld
-		mov es, ds
 		xor ch, ch		; ch will be 0 if val is pos and nonnull if val is neg
 		mov bx, si
 		cmp byte ptr ds:[si], '-'
@@ -718,15 +688,15 @@ atoi_10		proc
 		dec cl
 		xor ah, ah
 		mul bx
-		add offset resval, ax
+		add resval, ax
 		mov ax, 10
 		mul bx
 		mov bx, ax
 		jmp @@next
 		
-@@exit:		mov bx, offset resval
+@@exit:		mov dx, resval
 		jcxz @@nonneg		; cl == 0 (end of loop) checking ch
-		neg bx
+		neg dx
 		ret
 
 @@nonneg:	inc si
@@ -741,3 +711,5 @@ resval		dw 0
 ;==============================================================
 ;		    End of function section
 ;==============================================================
+
+end		start
