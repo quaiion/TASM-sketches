@@ -1,10 +1,10 @@
-VIDEOSEG	= 0b800h
-
-start:		mov ax, VIDEOSEG
+start:		mov ax, ds
 		mov es, ax
 
 		mov si, offset string
 		call strlen
+		mov ax, VIDEOSEG
+		mov es, ax
 		mov al, 'e'
 		mov ah, 0ceh
 		mov di, (80 * 5 + 10) * 2
@@ -18,15 +18,15 @@ string		db '1', '2', 'a', 'M', '5', '$'
 
 ---------------------------------------------------------------
 
-VIDEOSEG	= 0b800h
-
-start:		mov ax, VIDEOSEG
+start:		mov ax, ds
 		mov es, ax
 
 		mov si, offset string
 		mov dl, 'm'
 		call strchr
 		
+		mov ax, VISEOSEG
+		mov es, ax
 		cmp bx, -1
 		je none
 		mov si, bx
@@ -45,15 +45,15 @@ string		db '1', '2', 'a', 'M', '5', '$'
 
 ---------------------------------------------------------------
 
-VIDEOSEG	= 0b800h
-
-start:		mov ax, VIDEOSEG
+start:		mov ax, ds
 		mov es, ax
 
 		mov si, offset string
 		mov di, offset dest
 		call strcpy
 		
+		mov ax, VISEOSEG
+		mov es, ax
 		mov si, offset dest
 		mov di, (80 * 5 + 10) * 2
 		mov ah, 0ceh
@@ -69,8 +69,6 @@ string		db '1', '2', 'a', 'M', '5', '$'
 dest		db 'e', 'e', 'e', 'e', 'e', 'e', 'e', 'e', 'e', '$'
 
 ---------------------------------------------------------------
-
-VIDEOSEG	= 0b800h
 SIGN_MASK	= 80h
 
 start:		mov ax, VIDEOSEG
@@ -106,8 +104,6 @@ string_2	db 'a', 'b', 'c', 'd', 'e', 'g', 'e', 'e', 'e', '$'
 
 ---------------------------------------------------------------
 
-VIDEOSEG	= 0b800h
-
 start:		mov ax, ds
 		mov es, ax
 
@@ -133,8 +129,6 @@ next:		lodsb
 string		db 30 dup ('e')
 
 ---------------------------------------------------------------
-
-VIDEOSEG	= 0b800h
 
 start:		mov ax, ds
 		mov es, ax

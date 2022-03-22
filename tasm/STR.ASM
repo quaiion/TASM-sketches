@@ -3,7 +3,12 @@
 org 100h
 locals @@
 
-; Here you can place some oonitests
+VIDEOSEG	= 0b800h
+
+start:		; Here you can place some oonitests
+		
+		mov ax, 4c00h
+		int 21h
 
 ;==============================================================
 ;		       Function section
@@ -15,6 +20,7 @@ NEGAT_BIT	= 8000h
 ; STRLEN
 ; Counts number of symbols in a string
 ; Enter: SI = string addr
+;	 ES = segment for string's addressing
 ; Exit:  CX = number of symbs
 ; Note:	 Direction flag is set to UP
 ; Destr: SI CX
@@ -25,7 +31,7 @@ strlen		proc
 		cld
 		mov cx, si
 
-@@next:		cmp byte ptr ds:[si], '$'
+@@next:		cmp byte ptr es:[si], '$'
 		je @@exit
 		inc si
 		jmp @@next
@@ -42,10 +48,10 @@ strlen		proc
 ; Searches for a character in a string
 ; Enter: SI = string addr
 ;	 DL = ASCII code of character searched
+;	 ES = segment for string's addressing
 ; Exit:  BX = first appearance addr (-1 if no searched char found)
-; Note:  ES should be set to DS
-;	 Direction flag is set to UP
-; Destr: SI BX AL ES
+; Note:  Direction flag is set to UP
+; Destr: SI BX AL
 ;--------------------------------------------------------------
 
 strchr		proc
@@ -74,11 +80,11 @@ strchr		proc
 ; Copies all the string characters to another string
 ; Enter: SI = source string addr
 ;	 DI = dest string addr
+;	 ES = segment for strings' addressing
 ; Exit:  None
-; Note:  ES should be set to DS
-;	 Be aware of dest buffer overflow, string sizes are not compared
+; Note:  Be aware of dest buffer overflow, string sizes are not compared
 ;	 Direction flag is set to UP
-; Destr: SI DI AL ES
+; Destr: SI DI AL
 ;--------------------------------------------------------------
 
 strcpy		proc
@@ -100,12 +106,12 @@ strcpy		proc
 ; Compares 2 strings in lexicographic order
 ; Enter: SI = first string compared addr
 ;	 DI = second string compared addr
+;	 ES = segment for strings' addressing
 ; Exit:  AL > 0 if first str is greater
 ;	 AL < 0 if second str is greater
 ;	 AL = 0 if strings are similar
-; Note:  ES should be set to DS
-;	 Direction flag is set to UP
-; Destr: Destr: SI DI AX ES
+; Note:  Direction flag is set to UP
+; Destr: Destr: SI DI AX
 ;--------------------------------------------------------------
 
 strcmp		proc
@@ -113,7 +119,7 @@ strcmp		proc
 		cld
 
 @@next:		lodsb
-		mov ah, byte ptr ds:[di]
+		mov ah, byte ptr es:[di]
 		inc di
 		sub al, ah
 		test al, 0ffh
@@ -132,13 +138,13 @@ strcmp		proc
 ; Creates a string with an unsigned decimal number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CX = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX BX CX ES
+; Destr: AX BX CX
 ;--------------------------------------------------------------
 
 itoa_10		proc
@@ -157,7 +163,7 @@ itoa_10		proc
 		
 @@stop:		jcxz @@zero		; cl == ndigits; or 0, if zero
 		add di, cx
-		mov byte ptr ds:[di], '$'
+		mov byte ptr es:[di], '$'
 		dec di
 		std
 		mov ax, initval
@@ -178,7 +184,7 @@ itoa_10		proc
 		ret
 		
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '$0'
+		mov word ptr es:[di], '$0'
 		ret			; dx has not changed
 
 		endp
@@ -192,13 +198,13 @@ initval		dw ?
 ; Creates a string with a signed decimal number mentioned
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CX = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX BX CX ES
+; Destr: AX BX CX
 ;--------------------------------------------------------------
 
 sitoa_10	proc
@@ -228,13 +234,13 @@ sitoa_10	proc
 ; Creates a string with an unsigned binary number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 SENIOR_BITS_B	= 80h
@@ -256,7 +262,7 @@ itoa_2		proc
 		sub ah, cl
 		mov cl, ah		; cx == number of digits
 		add di, cx		; cl == cx
-		mov byte ptr ds:[di], '$'
+		mov byte ptr es:[di], '$'
 		dec di
 		std
 @@next:		mov al, dl
@@ -273,7 +279,7 @@ itoa_2		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '$0'
+		mov word ptr es:[di], '$0'
 		ret
 
 		endp
@@ -285,13 +291,13 @@ itoa_2		proc
 ; Creates a string with a signed binary number mentioned
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 sitoa_2		proc
@@ -321,13 +327,13 @@ sitoa_2		proc
 ; Creates a string with an unsigned quaternery number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 SENIOR_BITS_Q	= 0c0h
@@ -350,7 +356,7 @@ itoa_4		proc
 		mov cl, ah		; cl (and cx) == nbits
 		shr cl, 1			; nbits --> ndigits
 		add di, cx		; cl == cx
-		mov byte ptr ds:[di], '$'
+		mov byte ptr es:[di], '$'
 		dec di
 		std
 @@next:		mov al, dl
@@ -368,7 +374,7 @@ itoa_4		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '$0'
+		mov word ptr es:[di], '$0'
 		ret
 
 		endp
@@ -380,13 +386,13 @@ itoa_4		proc
 ; Creates a string with a signed quaternery number mentioned
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 sitoa_4		proc
@@ -416,13 +422,13 @@ sitoa_4		proc
 ; Creates a string with an unsigned octal number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 SENIOR_BITS_O	= 0e0h
@@ -451,7 +457,7 @@ itoa_8		proc
 		mov cl, al		; cl contains ndigits
 		xor ch, ch		; cl == cx
 		add di, cx
-		mov byte ptr ds:[di], '$'
+		mov byte ptr es:[di], '$'
 		dec di
 
 		std
@@ -473,7 +479,7 @@ itoa_8		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '$0'
+		mov word ptr es:[di], '$0'
 		ret
 
 		endp
@@ -485,13 +491,13 @@ itoa_8		proc
 ; Creates a string with a signed octal number mentioned
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 sitoa_8		proc
@@ -521,13 +527,13 @@ sitoa_8		proc
 ; Creates a string with an unsigned hex number mentioned
 ; Enter: DX = UNSIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked 
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 SENIOR_BITS_H	= 0f0h
@@ -551,7 +557,7 @@ itoa_16		proc
 		mov cl, ah		; cl (and cx) == nbits
 		shr cl, 2		; nbits --> ndigits (div by 4)
 		add di, cx		; cl == cx
-		mov byte ptr ds:[di], '$'
+		mov byte ptr es:[di], '$'
 		dec di
 
 		std
@@ -573,7 +579,7 @@ itoa_16		proc
 		ret
 
 @@zero:		mov cl, 2
-		mov word ptr ds:[di], '$0'
+		mov word ptr es:[di], '$0'
 		ret
 
 		ret
@@ -586,13 +592,13 @@ itoa_16		proc
 ; Creates a string with a signed hex number mentioned
 ; Enter: DX = SIGNED number's value
 ;	 DI = where-to-insert string addr
+;	 ES = segment for string's addressing
 ; Exit:  CL = size of string inserted
-; Note:  ES should be set to DS
-;	 The string should have enough free/unused space to store the digits;
+; Note:  The string should have enough free/unused space to store the digits;
 ;	 limits are not checked 
 ;	 No preceding zeros inserted (excluding the printing-zero case)
 ;	 Direction flag is set to DN
-; Destr: AX CX ES
+; Destr: AX CX
 ;--------------------------------------------------------------
 
 sitoa_16	proc
@@ -621,11 +627,11 @@ sitoa_16	proc
 ; ATOI_10
 ; Extracts a decimal number from a string
 ; Enter: SI = string addr
+;	 ES = segment for string's addressing
 ; Exit:  DX = signed value extracted
-; Note:  ES should be set to DS
-;	 The value extracted can be a number from -32768 to 32767 inclusively
+; Note:  The value extracted can be a number from -32768 to 32767 inclusively
 ;	 Direction flag is set to UP
-; Destr: AX BX CX DX ES
+; Destr: AX BX CX DX
 ;--------------------------------------------------------------
 
 atoi_10		proc
@@ -633,7 +639,7 @@ atoi_10		proc
 		cld
 		xor ch, ch		; ch will be 0 if val is pos and nonnull if val is neg
 		mov bx, si
-		cmp byte ptr ds:[si], '-'
+		cmp byte ptr es:[si], '-'
 		jne @@begin
 		inc si
 		inc bx
@@ -655,7 +661,7 @@ atoi_10		proc
 		mov bx, 1
 @@next:		test cl, 0ffh
 		jz @@exit
-		mov al, byte ptr ds:[si]
+		mov al, byte ptr es:[si]
 		dec si
 		sub al, '0'
 		dec cl
@@ -683,6 +689,215 @@ resval		dw 0
 
 ;==============================================================
 ;		    End of function section
+;==============================================================
+
+;==============================================================
+;		  Stack frame wrapper section
+;==============================================================
+; cdecl is used!
+
+;--------------------------------------------------------------
+; STRLEN
+; Counts number of symbols in a string
+; Enter: [SP] 	= string addr
+;	 [SP+2] = segment for string's addressing
+; Exit:  CX = number of symbs
+; Note:	 Direction flag is set to UP
+; Destr: SI CX
+;--------------------------------------------------------------
+
+strlen_s	proc
+		push bp
+		mov bp, sp
+
+		mov si, word ptr ss:[bp+4]
+		mov es, word ptr ss:[bp+6]
+		call strlen
+
+		pop bp
+		ret
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; STRCHR
+; Searches for a character in a string
+; Enter: [SP] 	= string addr
+;	 [SP+2] = ASCII code of character searched
+;	 [SP+4] = segment for string's addressing
+; Exit:  BX = first appearance addr (-1 if no searched char found)
+; Note:  Direction flag is set to UP
+; Destr: SI BX AL
+;--------------------------------------------------------------
+
+strchr_s	proc
+		push bp
+		mov bp, sp
+		
+		mov si, word ptr ss:[bp+4]
+		mov dl, byte ptr ss:[bp+6]
+		mov es, word ptr ss:[bp+8]
+		call strchr
+		
+		pop bp
+		ret
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; STRCPY
+; Copies all the string characters to another string
+; Enter: [SP]	= dest string addr
+;	 [SP+2] = source string addr
+;	 [SP+4] = segment for strings' addressing
+; Exit:  None
+; Note:  Be aware of dest buffer overflow, string sizes are not compared
+;	 Direction flag is set to UP
+; Destr: SI DI AL
+;--------------------------------------------------------------
+
+strcpy_s	proc
+		push bp
+		mov bp, sp
+		
+		mov di, word ptr ss:[bp+4]
+		mov si, word ptr ss:[bp+6]
+		mov es, word ptr ss:[bp+8]
+		call strcpy
+
+		pop bp
+		ret
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; STRCMP
+; Compares 2 strings in lexicographic order
+; Enter: [SP]	= first string compared addr
+;	 [SP+2] = second string compared addr
+;	 [SP+4] = segment for strings' addressing
+; Exit:  AL > 0 if first str is greater
+;	 AL < 0 if second str is greater
+;	 AL = 0 if strings are similar
+; Note:  Direction flag is set to UP
+; Destr: SI DI AX
+;--------------------------------------------------------------
+
+strcmp_s	proc
+		push bp
+		mov bp, sp
+		
+		mov si, word ptr ss:[bp+4]
+		mov di, word ptr ss:[bp+6]
+		mov es, word ptr ss:[bp+8]
+		call strcmp
+
+		pop bp
+		ret
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ITOA
+; Creates a string with an unsigned number mentioned
+; Enter: [SP]	= UNSIGNED number's value
+;	 [SP+2] = where-to-insert string addr
+;	 [SP+4] = radix, can be 2, 4, 8, 16 or 10
+;	 [SP+6] = segment for string's addressing
+; Exit:  CX = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+;	 If radix does not match any of the values listed above UB is performed
+; Destr: AX BX CX
+;--------------------------------------------------------------
+
+itoa_s		proc
+		push bp
+		mov bp, sp
+		
+		mov dx, word ptr ss:[bp+4]
+		mov di, word ptr ss:[bp+6]
+		mov bx, word ptr ss:[bp+8]
+		mov es, word ptr ss:[bp+10]
+		call ds:itoa_jt[bx]
+
+		pop bp
+		ret
+		endp
+
+itoa_jt		dw 0, itoa_2, itoa_4, 0, itoa_8
+		dw itoa_10, 0, 0, itoa_16
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; SITOA
+; Creates a string with a signed number mentioned
+; Enter: [SP]	= SIGNED number's value
+;	 [SP+2] = where-to-insert string addr
+;	 [SP+4] = radix, can be 2, 4, 8, 16 or 10
+;	 [SP+6] = segment for string's addressing
+; Exit:  CX = size of string inserted
+; Note:  The string should have enough free/unused space to store the digits;
+;	 limits are not checked
+;	 No preceding zeros inserted (excluding the printing-zero case)
+;	 Direction flag is set to DN
+;	 If radix does not match any of the values listed above UB is performed
+; Destr: AX BX CX
+;--------------------------------------------------------------
+
+sitoa_s		proc
+		push bp
+		mov bp, sp
+		
+		mov dx, word ptr ss:[bp+4]
+		mov di, word ptr ss:[bp+6]
+		mov bx, word ptr ss:[bp+8]
+		mov es, word ptr ss:[bp+10]
+		call ds:sitoa_jt[bx]
+
+		pop bp
+		ret
+		endp
+		
+sitoa_jt	dw 0, sitoa_2, sitoa_4, 0, sitoa_8
+		dw sitoa_10, 0, 0, sitoa_16
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; ATOI_10
+; Extracts a decimal number from a string
+; Enter: [SP]	= string addr
+;	 [SP+2] = segment for string's addressing
+; Exit:  DX = signed value extracted
+; Note:  The value extracted can be a number from -32768 to 32767 inclusively
+;	 Direction flag is set to UP
+; Destr: AX BX CX DX
+;--------------------------------------------------------------
+
+atoi_10_s	proc
+		push bp
+		mov bp, sp
+		
+		mov si, word ptr ss:[bp+4]
+		mov es, word ptr ss:[bp+6]
+		call atoi_10
+
+		pop bp
+		ret
+		endp
+
+;--------------------------------------------------------------
+
+;==============================================================
+;		     End of wrapper section
 ;==============================================================
 
 end		start
