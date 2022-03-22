@@ -3,95 +3,78 @@
 org 100h
 locals @@
 
-; Parameters taken from the command prompt:
+; Adjusted parameters:
 
-HEI		equ byte ptr cs:[92h]
-WID		equ byte ptr cs:[90h]
-LTC		equ byte ptr cs:[84h]
-LBC		equ byte ptr cs:[88h]
-RTC		equ byte ptr cs:[86h]
-RBC		equ byte ptr cs:[8ah]
-HL		equ byte ptr cs:[8ch]
-VL		equ byte ptr cs:[8eh]
-CLR		equ byte ptr cs:[82h]
-TXT		equ byte ptr cs:[94h]
-
-; PSP-stored parameter string format:
-;--------------------------------------------------------------
-; [CLR][ ][LTC][ ][RTC][ ][LBC][ ][RBC][ ][HL][ ][VL][ ][WID][ ][HEI][ ][TXT...]
-;   |       |       |       |       |      |      |       |       |       |    
-; cs:82h  cs:84h  cs:86h  cs:88h  cs:8Ah cs:8Ch cs:8Eh  cs:90h  cs:92h  cs:94h
+CLR		= 1eh
+LTC		= '1'
+RTC 		= '2'
+LBC		= '3'
+RBC		= '4'
+HL		= '='
+VL		= '|'
+WID		= 18
+HEI		= 10
 ;--------------------------------------------------------------
 
 VIDEOSEG	= 0b800h
 SCR_CENT	= (80d * 12d + 40d) * 2
+ODD_BIT		= 0001h
 ; Box starts at 2 * ((12d - HEI/2) * 80d + 40d - WID/2)
 
 start:		mov ax, VIDEOSEG
 		mov es, ax
-
-		mov al, 80d
-		mul HEI
-		mov start_addr, SCR_CENT
-		sub start_addr, ax
-		mov bl, WID
-		xor bh, bh
-		sub start_addr, bx
-		shr start_addr, 1
-		shl start_addr, 1
-		sub bx, 2		; now WID-2 can be reached through bx
+		mov ah, CLR
+		mov di, SCR_CENT - 80 * (HEI/2*2) - (WID/2*2)
 
 		mov dl, LTC
 		mov dh, RTC
-		mov di, start_addr
-		mov cx, bx
 		call draw_hor_line
 		
-		mov dl, HEI
-		sub dl, 2
-		mov cx, bx
-		mov di, start_addr
+		mov dl, HEI - 3
+		test dl, ODD_BIT
+		jz evn
+		inc dl
+evn:		shr dl, 1
 		add di, 80d * 2
+		sub di, WID * 2
+		call draw_emp_lays
+		mov si, offset TXT
+		call strlen
+		mov si, offset TXT
+		call draw_text_lay
+		mov dl, HEI - 3
+		shr dl, 1
 		call draw_emp_lays
 
-		mov dl, LTC
-		mov dh, RTC
-		mov di, start_addr
-		mov cx, bx
-		mov bh, HEI
-		sub bh, 1
-		mov al, 80d * 2
-		mul bh
-		add di, ax
+		mov dl, LBC
+		mov dh, RBC
 		call draw_hor_line
 
 		mov ax, 4c00h
 		int 21h
 
-start_addr	dw ?
+TXT		db "TEST$"
 
 ;--------------------------------------------------------------
 ; Draws a horizontal line with corner symbs
 ; Entry: DL = left corner symb
 ;	 DH = right corner symb
 ;	 DI = start addr to draw
-;	 CX = line length (excl corners)
-; Exit:  None
+;	 AH = color byte
+;	 WID defined as box's width const
+;	 HL defined as horiz line symb const
+; Exit:  DI = ptr to videoseg cell after last filled
 ; Note:  ES = video segment addr
-;	 Color byte ptr constant (CLR) should be defined
-;	 Right and left top corners byte ptr constants (LTC, RTC)
-;	 should be defined
-; Destr: AX CX DI
+; Destr: AL CX DI
 ;--------------------------------------------------------------
 		
 draw_hor_line	proc
 
 		cld
-
-		mov ah, CLR
 		mov al, dl
 		stosw
 
+		mov cx, WID - 2
 		mov al, HL
 		rep stosw
 
@@ -108,29 +91,47 @@ draw_hor_line	proc
 ; Entry: SI = addr of the text start
 ;	 DI = start addr to draw
 ; 	 CX = text string length
-; Exit:  SI = byte ptr to a symb, following after last typed
+;	 AH = color byte
+;	 WID defined as box's width const
+;	 VL defined as vert line symb const
+; Exit:  DI = beginning of the next layer
 ; Note:  ES = video segment addr
-;	 Color byte ptr constant (CLR) should be defined
-;	 Vertical edge symb byte ptr constant (VL) should be defined
-; Destr: AX CX SI DI
+; Destr: AL BX CX DX SI DI
 ;--------------------------------------------------------------
 
-draw_hor_lay	proc
+draw_text_lay	proc
 
 		cld
-
-		mov ah, CLR
 		mov al, VL		
 		stosw
 
-		jcxz @@skip
+		cmp cx, WID - 2
+		je @@next
+		mov dx, WID - 2
+		sub dx, cx
+		mov al, ' '
+		test dx, ODD_BIT
+		jz @@evn
+		stosw
+@@evn:		shr dx, 1
+		mov bx, dx
+		xchg dx, cx
+		rep stosw
+		mov cx, dx
+
 @@next:		lodsb		
 		stosw
 		loop @@next
+		
+		mov cx, bx
+		mov al, ' '
+		rep stosw
 
-@@skip:		mov al, VL
+		mov al, VL
 		stosw
 
+		add di, 80d * 2
+		sub di, WID * 2
 		ret
 		endp
 
@@ -139,45 +140,60 @@ draw_hor_lay	proc
 ;--------------------------------------------------------------
 ; Draws a number of empty horizontal box layers
 ; Entry: DI = start addr to draw
-;	 CX = one layer's length (excl edge symbs)
 ;	 DL = number of layers to be drawn
-;	 BX = box's width - 2
-; Exit:  None
+;	 AH = color byte
+;	 WID defined as box's width const
+;	 VL defined as vert line symb const
+; Exit:  DI = beginning of the next layer
 ; Note:	 ES = video segment addr
-;	 Color byte ptr constant (CLR) should be defined
-;	 Box width byte ptr constant (WID) should be defined
-;	 Vertical edge symb byte ptr constant (VL) should be defined
-; Destr: AX DL DI CX
+; Destr: AL DL DI CX
 ;--------------------------------------------------------------
 
 draw_emp_lays	proc
 
 		cld
 
-		mov ah, CLR
-		push cx
-
-@@next:	cmp dl, 0
-		jbe @@exit
-
+@@next:		mov cx, WID - 2
+		test dl, 0ffh
+		jz @@exit
 		mov al, VL
 		stosw
 		mov al, ' '
 		rep stosw
 		mov al, VL
 		stosw
-
 		dec dl
 		add di, 80d * 2
-		mov cx, bx
-		add cx, 2
-		shl cx, 1
-		sub di, cx
-		pop cx
-		push cx
+		sub di, WID * 2
 		jmp @@next
 
-@@exit:	ret
+@@exit:		ret
+		endp
+
+;--------------------------------------------------------------
+
+;--------------------------------------------------------------
+; STRLEN
+; Counts number of symbols in a string
+; Enter: SI = string addr
+; Exit:  CX = number of symbs
+; Note:	 Direction flag is set to UP
+; Destr: SI CX
+;--------------------------------------------------------------
+
+strlen		proc
+
+		cld
+		mov cx, si
+
+@@next:		cmp byte ptr ds:[si], '$'
+		je @@exit
+		inc si
+		jmp @@next
+
+@@exit:		sub si, cx
+		mov cx, si
+		ret
 		endp
 
 ;--------------------------------------------------------------

@@ -3,35 +3,7 @@
 org 100h
 locals @@
 
-VIDEOSEG	= 0b800h
-
-start:		mov ax, ds
-		mov es, ax
-
-		mov si, offset source
-		call atoi_10
-
-		mov dx, bx
-		mov di, offset string
-		call itoa_8
-
-		cld
-		mov ax, VIDEOSEG
-		mov es, ax
-		
-		mov di, (80 * 5 + 10) * 2
-		mov si, offset string
-		mov ah, 0ceh
-		mov cx, 30
-next:		lodsb
-		stosw
-		loop next
-		
-		mov ax, 4c00h
-		int 21h
-
-source		db '9', '3', '2', '$'
-string		db 30 dup ('e')
+; Here you can place some oonitests
 
 ;==============================================================
 ;		       Function section
@@ -673,10 +645,11 @@ atoi_10		proc
 		cmp al, '0'
 		jb @@stop
 		jmp @@begin
-		
-@@stop:		mov dx, si
-		sub dx, bx		; dh == 0, number is too low to fill it, cl contains the num of digits
-		mov cl, dl
+
+@@stop:		dec si
+		mov dx, si
+		sub dx, bx		; dh == 0, number is too low to fill it
+		mov cl, dl		; cl == ndigits
 		dec si
 
 		mov bx, 1
