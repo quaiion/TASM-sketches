@@ -23,7 +23,7 @@ NEGAT_BIT	= 8000h
 ;	 ES = segment for string's addressing
 ; Exit:  CX = number of symbs
 ; Note:	 Direction flag is set to UP
-; Destr: SI CX
+; Destr: CX
 ;--------------------------------------------------------------
 
 strlen		proc
@@ -36,8 +36,8 @@ strlen		proc
 		inc si
 		jmp @@next
 
-@@exit:		sub si, cx
-		mov cx, si
+@@exit:		xchg si, cx
+		sub cx, si
 		ret
 		endp
 
@@ -703,7 +703,7 @@ resval		dw 0
 ;	 [SP+2] = segment for string's addressing
 ; Exit:  CX = number of symbs
 ; Note:	 Direction flag is set to UP
-; Destr: SI CX
+; Destr: CX
 ;--------------------------------------------------------------
 
 strlen_s	proc
@@ -825,7 +825,7 @@ itoa_s		proc
 		mov di, word ptr ss:[bp+6]
 		mov bx, word ptr ss:[bp+8]
 		mov es, word ptr ss:[bp+10]
-		call ds:itoa_jt[bx]
+		call itoa_jt[bx]
 
 		pop bp
 		ret
@@ -860,7 +860,7 @@ sitoa_s		proc
 		mov di, word ptr ss:[bp+6]
 		mov bx, word ptr ss:[bp+8]
 		mov es, word ptr ss:[bp+10]
-		call ds:sitoa_jt[bx]
+		call sitoa_jt[bx]
 
 		pop bp
 		ret

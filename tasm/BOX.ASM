@@ -14,6 +14,7 @@ HL		= '='
 VL		= '|'
 WID		= 18
 HEI		= 10
+NLIN		= 3
 ;--------------------------------------------------------------
 
 VIDEOSEG	= 0b800h
@@ -30,7 +31,7 @@ start:		mov ax, VIDEOSEG
 		mov dh, RTC
 		call draw_hor_line
 		
-		mov dl, HEI - 3
+		mov dl, HEI - 2 * NLIN + 1
 		test dl, ODD_BIT
 		jz evn
 		inc dl
@@ -40,8 +41,17 @@ evn:		shr dl, 1
 		call draw_emp_lays
 		mov si, offset TXT
 		call strlen
-		mov si, offset TXT
 		call draw_text_lay
+		
+		mov txt_ctr, NLIN - 1
+doublin:	mov dl, 1
+		call draw_emp_lays
+		call strlen
+		call draw_text_lay
+		dec txt_ctr
+		test txt_ctr, 0ffh
+		jnz doublin
+		
 		mov dl, HEI - 3
 		shr dl, 1
 		call draw_emp_lays
@@ -53,7 +63,8 @@ evn:		shr dl, 1
 		mov ax, 4c00h
 		int 21h
 
-TXT		db "TEST$"
+txt_ctr		db 0
+TXT		db "TEST_1$TEST_2$TEST_3$"
 
 ;--------------------------------------------------------------
 ; Draws a horizontal line with corner symbs
@@ -95,6 +106,7 @@ draw_hor_line	proc
 ;	 WID defined as box's width const
 ;	 VL defined as vert line symb const
 ; Exit:  DI = beginning of the next layer
+;	 SI = a ptr to char after '$'
 ; Note:  ES = video segment addr
 ; Destr: AL BX CX DX SI DI
 ;--------------------------------------------------------------
@@ -119,7 +131,7 @@ draw_text_lay	proc
 		rep stosw
 		mov cx, dx
 
-@@next:		lodsb		
+@@next:		lodsb
 		stosw
 		loop @@next
 		
@@ -132,6 +144,7 @@ draw_text_lay	proc
 
 		add di, 80d * 2
 		sub di, WID * 2
+		inc si
 		ret
 		endp
 
@@ -178,7 +191,7 @@ draw_emp_lays	proc
 ; Enter: SI = string addr
 ; Exit:  CX = number of symbs
 ; Note:	 Direction flag is set to UP
-; Destr: SI CX
+; Destr: CX
 ;--------------------------------------------------------------
 
 strlen		proc
@@ -191,8 +204,8 @@ strlen		proc
 		inc si
 		jmp @@next
 
-@@exit:		sub si, cx
-		mov cx, si
+@@exit:		xchg si, cx
+		sub cx, si
 		ret
 		endp
 
