@@ -1,0 +1,150 @@
+start:	mov di, offset string
+		call strlen
+		mov ax, VIDEOSEG
+		mov es, ax
+		mov al, 'e'
+		mov ah, 0ceh
+		mov di, (80 * 5 + 10) * 2
+next:		stosw
+		loop next
+		
+		mov ax, 4c00h
+		int 21h
+
+string		db '1', '2', 'a', 'M', '5', '$'
+
+---------------------------------------------------------------
+
+start:	mov di, offset string
+		mov al, 'm'
+		call strchr
+		
+		mov ax, VIDEOSEG
+		mov es, ax
+		cmp bx, -1
+		je none
+		mov si, bx
+		mov al, byte ptr ds:[si]
+cont:		mov ah, 0ceh
+		mov di, (80 * 5 + 10) * 2
+		stosw
+
+		mov ax, 4c00h
+		int 21h
+		
+none:		mov al, 'e'
+		jmp cont
+
+string		db '1', '2', 'a', 'M', '5', '$'
+
+---------------------------------------------------------------
+
+start:	mov ax, ds
+		mov es, ax
+
+		mov si, offset string
+		mov di, offset dest
+		call strcpy
+
+		mov ax, VIDEOSEG
+		mov es, ax
+		mov si, offset dest
+		mov di, (80 * 5 + 10) * 2
+		mov ah, 0ceh
+		mov cx, 7
+next:		lodsb
+		stosw
+		loop next
+
+		mov ax, 4c00h
+		int 21h
+
+string		db '1', '2', 'a', 'M', '5', '$'
+dest		db 'e', 'e', 'e', 'e', 'e', 'e', 'e', 'e', 'e', '$'
+
+---------------------------------------------------------------
+
+start:		mov ax, ds
+		mov es, ax
+
+		mov si, offset string_1
+		mov di, offset string_2
+		call strcmp
+		
+		ja ab
+		jb be
+		je ee
+
+cont:	mov dx, VIDEOSEG
+		mov es, dx	
+
+		mov ah, 0ceh
+		mov di, (80 * 5 + 10) * 2
+		stosw
+
+		mov ax, 4c00h
+		int 21h
+		
+ab:		mov al, 'a'
+		jmp cont
+		
+be:		mov al, 'b'
+		jmp cont
+		
+ee:		mov al, 'e'
+		jmp cont
+
+string_1	db 'b', 'a', 'c', 'd', 'e', '$'
+string_2	db 'a', 'b', 'c', 'd', 'e', 'g', 'e', 'e', 'e', '$'
+
+---------------------------------------------------------------
+
+start:		mov ax, ds
+		mov es, ax
+
+		mov di, offset string
+		mov dx, 14
+		call itoa_10
+
+		cld
+		mov ax, VIDEOSEG
+		mov es, ax
+		
+		mov di, (80 * 5 + 10) * 2
+		mov si, offset string
+		mov ah, 0ceh
+		mov cx, 30
+next:		lodsb
+		stosw
+		loop next
+		
+		mov ax, 4c00h
+		int 21h
+
+string		db 30 dup ('e')
+
+---------------------------------------------------------------
+
+start:	mov si, offset source
+		call atoi_10
+
+		mov di, offset string
+		call itoa_10
+
+		cld
+		mov ax, VIDEOSEG
+		mov es, ax
+		
+		mov di, (80 * 5 + 10) * 2
+		mov si, offset string
+		mov ah, 0ceh
+		mov cx, 30
+next:		lodsb
+		stosw
+		loop next
+		
+		mov ax, 4c00h
+		int 21h
+
+source		db '9', '3', '2', '$'
+string		db 30 dup ('e')

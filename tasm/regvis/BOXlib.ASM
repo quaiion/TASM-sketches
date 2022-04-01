@@ -1,31 +1,42 @@
-.model tiny
-.code
-org 100h
-locals @@
-
-; Adjusted parameters:
-
-CLR		= 1eh
-LTC		= '1'
-RTC 		= '2'
-LBC		= '3'
-RBC		= '4'
-HL		= '='
-VL		= '|'
-WID		= 18
-HEI		= 10
-NLIN		= 3
 ;--------------------------------------------------------------
 
-VIDEOSEG	= 0b800h
+;	'locals @@' should be set
+;	'VIDEOSEG = 0b800h' should be defined
+;	'TXT db "<text>$"' should be defined
+
+;	Adjusted parameters should be defined:
+
+;	CLR		= 1eh
+;	LTC		= '1'
+;	RTC 		= '2'
+;	LBC		= '3'
+;	RBC		= '4'
+;	HL		= '='
+;	VL		= '|'
+;	WID		= 18
+;	HEI		= 10
+;	NLIN		= 3
+
+;--------------------------------------------------------------
+
 SCR_CENT	= (80d * 12d + 40d) * 2
 ODD_BIT		= 0001h
-; Box starts at 2 * ((12d - HEI/2) * 80d + 40d - WID/2)
+BOX_START	= SCR_CENT - 80 * (HEI/2*2) - (WID/2*2)
 
-start:		mov ax, VIDEOSEG
-		mov es, ax
+;--------------------------------------------------------------
+; Draws a custom box
+; Entry: ES = video segment addr
+;	 DS = initial code seg
+;	 Constants and a string variable mentioned above should be defined
+; Exit:  None
+; Note:  None
+; Destr: AX BX CX DX SI DI
+;--------------------------------------------------------------
+
+draw_box	proc
+
 		mov ah, CLR
-		mov di, SCR_CENT - 80 * (HEI/2*2) - (WID/2*2)
+		mov di, BOX_START
 
 		mov dl, LTC
 		mov dh, RTC
@@ -42,13 +53,13 @@ evn:		shr dl, 1
 		call strlends
 		call draw_text_lay
 		
-		mov txt_ctr, NLIN - 1
+		mov ds:txt_ctr, NLIN - 1
 doublin:	mov dl, 1
 		call draw_emp_lays
 		call strlends
 		call draw_text_lay
-		dec txt_ctr
-		test txt_ctr, 0ffh
+		dec ds:txt_ctr
+		test ds:txt_ctr, 0ffh
 		jnz doublin
 		
 		mov dl, HEI - (2*NLIN - 1) - 2
@@ -59,11 +70,12 @@ doublin:	mov dl, 1
 		mov dh, RBC
 		call draw_hor_line
 
-		mov ax, 4c00h
-		int 21h
+		ret
+		endp
 
 txt_ctr		db 0
-TXT		db "TEST_1$TEST_2$TEST_3$"
+
+;--------------------------------------------------------------
 
 ;--------------------------------------------------------------
 ; Draws a horizontal line with corner symbs
@@ -107,6 +119,7 @@ draw_hor_line	proc
 ; Exit:  DI = beginning of the next layer
 ;	 SI = a ptr to char after '$'
 ; Note:  ES = video segment addr
+;	 DS = initial code seg
 ; Destr: AL BX CX DX SI DI
 ;--------------------------------------------------------------
 
@@ -208,5 +221,3 @@ strlends	proc
 		endp
 
 ;--------------------------------------------------------------
-
-end		start
