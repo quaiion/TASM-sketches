@@ -9,8 +9,8 @@ start:          mov ax, cs
                 mov ax, 2509h
                 mov dx, offset new09h
                 int 21h
-		
-		mov codseg, cs
+
+                mov codseg, cs
 
                 mov ax, 3100h
                 mov dx, offset EOP
@@ -40,19 +40,19 @@ on:             cmp al, 13h             ; 'R' key
                 cmp al, 26h             ; 'L' key
                 ja stop
 
-		push bx es
+                push bx es
 
                 xor bh, bh
                 mov bl, al
-                sub bx, 13h		; prepare the index
+                sub bx, 13h             ; prepare the index
                 shl bx, 1
-		
-		db 0b8h			; perform 'mov ax, <codseg>'
-codseg		dw 0		
-		mov es, ax
+
+                db 0b8h	                ; perform 'mov ax, <codseg>'
+codseg          dw 0
+                mov es, ax
                 mov ax, es:note[bx]
 
-		pop es bx
+                pop es bx
                 test ax, 0ffffh         ; maybe there are better solutions
                 jz stop
 
@@ -66,10 +66,10 @@ codseg		dw 0
 
 stop:           in al, 61h              ; finish work with kybd
                 mov ah, al
-		or al, 80h
-		out 61h, al
-		mov al, ah
-		out 61h, al
+                or al, 80h
+                out 61h, al
+                mov al, ah
+                out 61h, al
 
                 mov al, 20h             ; finish the int
                 out 20h, al
